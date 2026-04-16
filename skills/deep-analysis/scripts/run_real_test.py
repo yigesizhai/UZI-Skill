@@ -763,13 +763,18 @@ def main(ticker: str = "002273.SZ"):
     from inline_assets import main as inline_main
     standalone = inline_main(ti.full)
 
-    print(f"\n✅ All done!")
-    print(f"   Standalone: {standalone}")
+    # Ensure standalone file is fully written before opening
+    standalone_path = Path(standalone).resolve()
+    assert standalone_path.exists() and standalone_path.stat().st_size > 10000, \
+        f"Standalone file missing or too small: {standalone_path}"
 
-    # Auto-open in browser
+    print(f"\n✅ All done!")
+    print(f"   Standalone: {standalone_path}")
+    print(f"   Size: {standalone_path.stat().st_size // 1024} KB")
+
+    # Auto-open AFTER everything is complete
     import webbrowser
-    abs_path = Path(standalone).resolve()
-    webbrowser.open(f"file:///{abs_path}")
+    webbrowser.open(standalone_path.as_uri())
     print(f"   🌐 已在浏览器中打开")
 
 
