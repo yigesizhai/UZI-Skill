@@ -197,6 +197,6 @@ This tool generates analysis reports using AI models based on public data. All s
 
 <div align="center">
 
-MIT License · Made by Float Future · O.o
+MIT License · Made by FloatFu-true · O.o
 
 </div>

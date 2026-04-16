@@ -4,7 +4,7 @@
 >
 > 来源全部为公开网络（雪球 / 淘股吧 / 知乎 / 公众号 / 财经媒体），每条都附 URL 可溯源。
 >
-> 收录于 2026-04 by Float Future research agent.
+> 收录于 2026-04 by FloatFu-true research agent.
 
 ---
 

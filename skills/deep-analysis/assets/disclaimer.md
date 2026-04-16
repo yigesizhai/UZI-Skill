@@ -1,6 +1,6 @@
 # 免责声明 · Disclaimer
 
-本报告由 AI 模型（Stock Deep Analyzer · Float Future）基于以下公开信息生成：
+本报告由 AI 模型（Stock Deep Analyzer · FloatFu-true）基于以下公开信息生成：
 
 1. akshare / yfinance / baostock 等开源数据库
 2. 东方财富、巨潮资讯、财联社等公开 API
@@ -39,4 +39,4 @@
 
 > 工具的目的是让你少被人骗，而不是替别人骗你。
 
-— Float Future · O.o
+— FloatFu-true · O.o

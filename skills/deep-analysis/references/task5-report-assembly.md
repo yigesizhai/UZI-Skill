@@ -37,7 +37,7 @@ PNG 由 Playwright 截 HTML 内的隐藏 div：
 ## HTML 报告结构（`assets/report-template.html`）
 
 ```
-1. NAV       Float Future · ALPHA TERMINAL
+1. NAV       FloatFu-true · 游资 SKILLS
 2. HERO      股票名 + 价格 + 一句话定调 + O.o 雷达眼水印
 3. SAFETY    🟢🟡🟠🔴 杀猪盘横幅
 4. CORE      4 段 Dashboard（大众视图）⭐ 主视觉
