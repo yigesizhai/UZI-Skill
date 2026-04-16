@@ -32,6 +32,8 @@ Do NOT proceed to report generation until you have:
 1. READ the panel.json skeleton scores
 2. ANALYZED each investor group from their perspective
 3. UPDATED panel.json with your judgments
+4. WRITTEN agent_analysis.json with dim_commentary + panel_insights + overrides
+5. SET agent_reviewed: true in agent_analysis.json
 </HARD-GATE>
 
 Stage 1 跑完后，你必须：
@@ -60,9 +62,32 @@ Stage 1 跑完后，你必须：
 
 **3c. 把分析结果更新到 panel.json**
 
+**3d. 写 `agent_analysis.json`（闭环关键！）**
+
+写入 `.cache/{ticker}/agent_analysis.json`，包含：
+```json
+{
+  "agent_reviewed": true,
+  "dim_commentary": { "0_basic": "你的定性评语", ... },
+  "panel_insights": "整体评委观察",
+  "great_divide_override": {
+    "punchline": "一句能传播的冲突金句",
+    "bull_say_rounds": ["第1轮多方说", "第2轮", "第3轮"],
+    "bear_say_rounds": ["第1轮空方说", "第2轮", "第3轮"]
+  },
+  "narrative_override": {
+    "core_conclusion": "综合结论",
+    "risks": ["风险1", "风险2", ...],
+    "buy_zones": { "value": {...}, "growth": {...}, "technical": {...}, "youzi": {...} }
+  }
+}
+```
+
+**stage2() 会自动读取并合并。** 你写的字段优先级高于脚本生成的 stub。
+
 ### Step 4 · 生成报告（脚本完成）
 
-调用 `stage2()` 读取你更新后的 panel.json，生成综合研判 + HTML 报告。
+调用 `stage2()` 读取你更新后的 panel.json + agent_analysis.json，生成综合研判 + HTML 报告。
 
 ### Step 5 · 向用户汇报
 

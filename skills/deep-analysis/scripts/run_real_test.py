@@ -518,8 +518,18 @@ def generate_panel(dims_scored: dict, raw: dict) -> dict:
     }
 
 
-def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
+def generate_synthesis(raw: dict, dims_scored: dict, panel: dict, agent_analysis: dict | None = None) -> dict:
+    """Generate synthesis — merges agent_analysis.json if provided.
+
+    agent_analysis keys (all optional, agent writes what it has):
+      - dim_commentary: {dim_key: "agent's qualitative note"}
+      - panel_insights: "agent's panel-level narrative"
+      - great_divide_override: {punchline, bull_say_rounds, bear_say_rounds}
+      - narrative_override: {core_conclusion, risks, buy_zones}
+      - agent_reviewed: True  (marks that agent has intervened)
+    """
     from compute_friendly import compute_scenarios, compute_exit_triggers
+    ag = agent_analysis or {}
 
     basic = (raw.get("dimensions", {}).get("0_basic") or {}).get("data") or {}
     name = basic.get("name") or raw.get("ticker")
@@ -578,21 +588,26 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
     bear_pass_rules = bear.get("pass", [])
     bear_fail_rules = bear.get("fail", [])
 
+    # Build debate rounds — agent can override with great_divide_override
+    gd_override = ag.get("great_divide_override") or {}
+    agent_bull_rounds = gd_override.get("bull_say_rounds") or []
+    agent_bear_rounds = gd_override.get("bear_say_rounds") or []
+
     rounds = [
         {
             "round": 1,
-            "bull_say": bull_headline,
-            "bear_say": bear_headline,
+            "bull_say": agent_bull_rounds[0] if len(agent_bull_rounds) > 0 else bull_headline,
+            "bear_say": agent_bear_rounds[0] if len(agent_bear_rounds) > 0 else bear_headline,
         },
         {
             "round": 2,
-            "bull_say": " · ".join(r.get("msg", r.get("name", "")) for r in bull_pass_rules[:3]) or "数据支持我的判断。",
-            "bear_say": " · ".join(r.get("msg", r.get("name", "")) for r in bear_fail_rules[:3]) or "风险点太多。",
+            "bull_say": agent_bull_rounds[1] if len(agent_bull_rounds) > 1 else (" · ".join(r.get("msg", r.get("name", "")) for r in bull_pass_rules[:3]) or "数据支持我的判断。"),
+            "bear_say": agent_bear_rounds[1] if len(agent_bear_rounds) > 1 else (" · ".join(r.get("msg", r.get("name", "")) for r in bear_fail_rules[:3]) or "风险点太多。"),
         },
         {
             "round": 3,
-            "bull_say": f"综合看，{bull.get('score', 0)} 分，我的立场不变。",
-            "bear_say": f"综合看，{bear.get('score', 0)} 分，风险大于收益。",
+            "bull_say": agent_bull_rounds[2] if len(agent_bull_rounds) > 2 else f"综合看，{bull.get('score', 0)} 分，我的立场不变。",
+            "bear_say": agent_bear_rounds[2] if len(agent_bear_rounds) > 2 else f"综合看，{bear.get('score', 0)} 分，风险大于收益。",
         },
     ]
 
@@ -615,8 +630,11 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
     upside = (init_cov.get("headline") or {}).get("upside_pct", 0) or 0
     rating = (init_cov.get("headline") or {}).get("rating", "")
 
-    # Try to build a "conflict" punchline from DCF vs LBO vs current price
-    if dcf_sm and lbo_irr and abs(dcf_sm) > 10 and lbo_irr > 15:
+    # Punchline: prefer agent override, fallback to script generation
+    agent_punchline = gd_override.get("punchline") or ""
+    if agent_punchline:
+        punchline = agent_punchline
+    elif dcf_sm and lbo_irr and abs(dcf_sm) > 10 and lbo_irr > 15:
         if dcf_sm < 0 and lbo_irr > 20:
             punchline = f"DCF 说高估 {abs(dcf_sm):.0f}%，但 LBO 测试显示 PE 买方仍能赚 {lbo_irr:.0f}% IRR — 冲突很有意思。"
         elif dcf_sm > 15 and lbo_irr > 20:
@@ -628,17 +646,20 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
     else:
         punchline = f"{name} · ROE 历史与当前估值存在结构性分歧，等待方向明朗。"
 
-    # Risks — generated from low-scoring dimensions + institutional modeling
-    risks = []
-    for key, dim in dims_scored["dimensions"].items():
-        if dim["score"] <= 4:
-            reasons = dim.get("reasons_fail", [])
-            if reasons:
-                risks.extend(reasons[:1])
-            else:
-                # Use dim name as fallback
-                dim_name = dim.get("name") or dim.get("label") or key
-                risks.append(f"{dim_name} 评分偏低 ({dim['score']}/10)")
+    # Risks: prefer agent-written, fallback to script generation from low-scoring dims
+    narrative_override = ag.get("narrative_override") or {}
+    agent_risks = narrative_override.get("risks") or []
+    risks = list(agent_risks) if agent_risks else []
+    if not risks:
+        for key, dim in dims_scored["dimensions"].items():
+            if dim["score"] <= 4:
+                reasons = dim.get("reasons_fail", [])
+                if reasons:
+                    risks.extend(reasons[:1])
+                else:
+                    # Use dim name as fallback
+                    dim_name = dim.get("name") or dim.get("label") or key
+                    risks.append(f"{dim_name} 评分偏低 ({dim['score']}/10)")
 
     # If still empty, generate dynamic risks from actual data instead of hardcoded ones
     if not risks:
@@ -670,12 +691,14 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
     exit_triggers = compute_exit_triggers(raw, dims_scored, {})
     similar_stocks = raw.get("similar_stocks", [])
 
-    # Dashboard
+    # Dashboard — core_conclusion: agent override > script
     ytd_return = (kline.get("kline_stats") or {}).get("ytd_return", "—")
-    core_conclusion = f"{name} · {int(overall)} 分 · {verdict_label}。51 位大佬里 {panel['signal_distribution']['bullish']} 人看多，YTD {ytd_return}。{punchline}"
+    agent_core_conclusion = narrative_override.get("core_conclusion") or ""
+    core_conclusion = agent_core_conclusion or f"{name} · {int(overall)} 分 · {verdict_label}。51 位大佬里 {panel['signal_distribution']['bullish']} 人看多，YTD {ytd_return}。{punchline}"
 
-    # v2.0 · Auto-generated dim_commentary stubs (Claude should rewrite these)
-    dim_commentary_stub: dict[str, str] = {}
+    # v2.2 · dim_commentary: prefer agent-written, fallback to stub
+    agent_dim_commentary = ag.get("dim_commentary") or {}
+    dim_commentary_final: dict[str, str] = {}
     dim_labels = {
         "0_basic": "基础信息",
         "1_financials": "财报",
@@ -688,11 +711,15 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
         "18_trap": "杀猪盘",
     }
     for dim_key, label in dim_labels.items():
-        dim = (raw.get("dimensions", {}).get(dim_key) or {})
-        score_info = dims_scored.get("dimensions", {}).get(dim_key) or {}
-        if dim.get("data"):
-            score = score_info.get("score", 0)
-            dim_commentary_stub[dim_key] = f"[脚本占位] {label} 得分 {score}/10 · 需 Claude 补充定性评语"
+        # Agent-written commentary takes priority
+        if dim_key in agent_dim_commentary and agent_dim_commentary[dim_key]:
+            dim_commentary_final[dim_key] = agent_dim_commentary[dim_key]
+        else:
+            dim = (raw.get("dimensions", {}).get(dim_key) or {})
+            score_info = dims_scored.get("dimensions", {}).get(dim_key) or {}
+            if dim.get("data"):
+                score = score_info.get("score", 0)
+                dim_commentary_final[dim_key] = f"[脚本占位] {label} 得分 {score}/10 · 需 Claude 补充定性评语"
 
     return {
         "ticker": raw["ticker"],
@@ -701,7 +728,7 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
         "verdict_label": verdict_label,
         "fundamental_score": round(fund_score, 1),
         "panel_consensus": round(consensus, 1),
-        "dim_commentary": dim_commentary_stub,  # Claude 在 Task 4 里重写这些
+        "dim_commentary": dim_commentary_final,  # agent-written > stub
         "institutional_modeling": {
             "dcf_intrinsic": dcf_summary.get("dcf_intrinsic"),
             "dcf_safety_margin_pct": dcf_summary.get("dcf_safety_margin_pct"),
@@ -716,11 +743,14 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
             "bcg_position": (competitive.get("bcg_position") or {}).get("category"),
             "industry_attractiveness": competitive.get("industry_attractiveness_pct"),
         },
+        "agent_reviewed": bool(ag.get("agent_reviewed")),
+        "panel_insights": ag.get("panel_insights") or "",
         "claude_narrative_stub": {
-            "_note": "以下字段是脚本生成的占位，Task 4 中 Claude 必须根据原始数据重写",
-            "needs_rewrite": ["great_divide.punchline", "dashboard.core_conclusion",
-                              "debate.rounds[*].bull_say", "debate.rounds[*].bear_say",
-                              "buy_zones.*.rationale", "risks[*]"],
+            "_note": "以下字段已由 agent 覆盖" if ag.get("agent_reviewed") else "以下字段是脚本生成的占位，Task 4 中 Claude 必须根据原始数据重写",
+            "needs_rewrite": [] if ag.get("agent_reviewed") else [
+                "great_divide.punchline", "dashboard.core_conclusion",
+                "debate.rounds[*].bull_say", "debate.rounds[*].bear_say",
+                "buy_zones.*.rationale", "risks[*]"],
         },
         "debate": {
             "bull": {"investor_id": bull["investor_id"], "name": bull["name"], "group": bull["group"]},
@@ -738,7 +768,7 @@ def generate_synthesis(raw: dict, dims_scored: dict, panel: dict) -> dict:
             "punchline": punchline,
         },
         "risks": risks,
-        "buy_zones": {
+        "buy_zones": narrative_override.get("buy_zones") or {
             "value": {"price": round(price * 0.85, 2) if price else "—", "rationale": "历史 PE 25 分位"},
             "growth": {"price": round(price * 0.92, 2) if price else "—", "rationale": "PEG 合理区"},
             "technical": {"price": round(price * 0.95, 2) if price else "—", "rationale": "MA60 支撑位"},
@@ -843,8 +873,11 @@ def stage1(ticker: str) -> dict:
     print(f"   ⏸️  此时 Claude agent 应介入：")
     print(f"      1. 读取 panel.json 中 51 人的骨架分")
     print(f"      2. Spawn 4 个 sub-agent 分组 role-play 投资者")
-    print(f"      3. 用 agent 判断覆盖 panel.json 中的 headline/reasoning")
-    print(f"      4. 然后调用 stage2('{ti.full}') 生成最终报告")
+    print(f"      3. 用 agent 判断覆盖 panel.json 中的 headline/reasoning/score")
+    print(f"      4. 写 agent_analysis.json 到 .cache/{ti.full}/")
+    print(f"         包含: dim_commentary, panel_insights, great_divide_override, narrative_override")
+    print(f"         设置 agent_reviewed: true")
+    print(f"      5. 然后调用 stage2('{ti.full}') 生成最终报告")
     print(f"{'━' * 50}")
 
     return {
@@ -859,8 +892,9 @@ def stage1(ticker: str) -> dict:
 def stage2(ticker: str) -> str:
     """Stage 2: 综合研判 + 报告组装。
 
-    在 Claude agent 审查/覆盖 panel.json 之后调用。
+    在 Claude agent 审查/覆盖 panel.json + 写入 agent_analysis.json 之后调用。
     读取 .cache 中的最新数据生成报告。
+    agent_analysis.json 的字段会合并进 synthesis，优先级高于脚本生成。
     返回报告路径。
     """
     from lib.cache import read_task_output
@@ -873,10 +907,27 @@ def stage2(ticker: str) -> str:
     if not (raw and dims and panel):
         raise RuntimeError(f"Stage 2 缺少数据，请先跑 stage1('{ticker}')")
 
+    # v2.2 · Read agent_analysis.json — the agent's written-back analysis
+    agent_analysis = read_task_output(ti.full, "agent_analysis")
+    if agent_analysis and agent_analysis.get("agent_reviewed"):
+        print(f"\n🧠 Agent 分析已加载 · agent_analysis.json")
+        ag_dc = agent_analysis.get("dim_commentary") or {}
+        ag_written = sum(1 for v in ag_dc.values() if v and "[脚本占位]" not in str(v))
+        print(f"   dim_commentary: {ag_written} 个维度有 agent 定性评语")
+        print(f"   panel_insights: {'✓' if agent_analysis.get('panel_insights') else '✗'}")
+        print(f"   narrative_override: {'✓' if agent_analysis.get('narrative_override') else '✗'}")
+        print(f"   great_divide_override: {'✓' if agent_analysis.get('great_divide_override') else '✗'}")
+    else:
+        print(f"\n⚠️  未检测到 agent_analysis.json · 将使用脚本骨架生成 synthesis")
+        print(f"   提示: Claude agent 应在 stage1 之后写入 .cache/{ti.full}/agent_analysis.json")
+        print(f"   然后再调用 stage2() · 这样报告质量会显著提升")
+        agent_analysis = None
+
     print(f"\n⚖ Task 4 · 综合研判")
-    syn = generate_synthesis(raw, dims, panel)
+    syn = generate_synthesis(raw, dims, panel, agent_analysis=agent_analysis)
     write_task_output(ti.full, "synthesis", syn)
     print(f"  综合评分: {syn['overall_score']}/100 · {syn['verdict_label']}")
+    print(f"  agent_reviewed: {syn.get('agent_reviewed', False)}")
 
     print(f"\n📄 Task 5 · 报告组装")
     from assemble_report import assemble
@@ -919,27 +970,16 @@ def stage2(ticker: str) -> str:
 
 
 def main(ticker: str = "002273.SZ"):
-    """完整流程: stage1 + stage2 一把跑完（无 agent 介入）。
+    """完整流程: stage1 + stage2 一把跑完（无 agent 介入 = 快速模式）。
 
     当 Claude agent 使用时，应该分开调用:
         result = stage1(ticker)   # 数据+骨架分
-        # ... agent 审查 panel.json, spawn sub-agents ...
-        stage2(ticker)            # 生成报告
+        # ... agent 审查 panel.json, 写 agent_analysis.json ...
+        stage2(ticker)            # 生成报告 (自动合并 agent_analysis)
     """
     stage1(ticker)
-    stage2(ticker)
-    print(f"   Standalone: {standalone_path}")
-    print(f"   Size: {standalone_path.stat().st_size // 1024} KB")
-
-    # Browser open is handled by run.py (supports --remote / --no-browser)
-    # Only auto-open if called directly (not via run.py)
-    if os.environ.get("UZI_NO_AUTO_OPEN") != "1":
-        try:
-            import webbrowser
-            webbrowser.open(standalone_path.as_uri())
-            print(f"   🌐 已在浏览器中打开")
-        except Exception:
-            print(f"   💡 无法打开浏览器，请手动打开: {standalone_path}")
+    report_path = stage2(ticker)
+    print(f"\n🎯 完整流程结束 · 报告: {report_path}")
 
 
 if __name__ == "__main__":

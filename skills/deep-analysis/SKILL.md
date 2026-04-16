@@ -78,7 +78,8 @@ Do NOT run stage2() until ALL of the following are complete:
 1. You have READ .cache/{ticker}/panel.json and reviewed the 51 skeleton scores
 2. You have SPAWNED sub-agents (or personally analyzed) each investor group
 3. You have MERGED agent results back into panel.json with updated headline/reasoning/score
-4. You have WRITTEN dim_commentary for at least the top 5 critical dimensions
+4. You have WRITTEN agent_analysis.json with dim_commentary (≥5 dimensions) + panel_insights
+5. You have SET agent_reviewed: true in agent_analysis.json
 
 Skipping this step produces a report with mechanical rule-engine output instead of
 genuine investment analysis. The whole point of this plugin is agent-driven judgment.
@@ -88,7 +89,52 @@ genuine investment analysis. The whole point of this plugin is agent-driven judg
 1. 读 `.cache/{ticker}/panel.json` 中 51 人的骨架分
 2. **Spawn 4 个并行 sub-agent 分组 role-play 投资者**——让他们真正"扮演"巴菲特/赵老哥思考
 3. 用 agent 的判断覆盖 panel.json 中的 headline/reasoning/score
-4. 写你自己的定性评语和叙事
+4. **写 `agent_analysis.json`** 到 `.cache/{ticker}/` — 这是闭环的关键！
+
+#### agent_analysis.json 格式
+
+```json
+{
+  "agent_reviewed": true,
+  "dim_commentary": {
+    "0_basic": "建筑央企，主营市政/房建。市值偏小，营收稳但利润率极薄（1.2%），典型低毛利基建股。",
+    "1_financials": "ROE 不到 8%，连续 3 年下滑。现金流波动大，应收账款占营收比偏高，回款风险明显。",
+    "2_kline": "均线空头排列，MACD 死叉，量能萎缩。典型下跌趋势，不满足 Stage 2 条件。"
+  },
+  "panel_insights": "51 评委中，价值派集体看空（ROE 太低+无护城河），游资中性（有地方城投概念但板块热度不够），只有少数逆向投资者给出中性偏多。整体共识 32%，偏弱。",
+  "great_divide_override": {
+    "punchline": "DCF 说高估 23%，但城投重组预期让 LBO 视角的 IRR 仍有 18% — 这个冲突值得关注。",
+    "bull_say_rounds": [
+      "宁波城投整合预期 + 地方债化解受益，估值有弹性",
+      "PB 仅 0.9x，历史底部区间，安全边际够",
+      "综合看 62 分，城投故事讲通了就是翻倍"
+    ],
+    "bear_say_rounds": [
+      "ROE 连降 3 年，基建毛利率 8% 是天花板",
+      "应收账款 / 营收 > 60%，回款是生死线",
+      "综合看 35 分，低质量资产不值得冒险"
+    ]
+  },
+  "narrative_override": {
+    "core_conclusion": "宁波建工 · 48 分 · 谨慎。典型地方基建股，ROE 不到 8%、毛利率 8%，靠城投整合讲故事。51 位大佬 12 人看多，29 人看空。DCF 高估 23%，但 LBO 压力测试 IRR 18% — 博弈价值存在但风险更大。",
+    "risks": [
+      "ROE 持续下滑，连续 3 年低于 8%",
+      "应收账款占比过高，回款周期拉长",
+      "地方财政压力传导至工程款支付",
+      "行业竞争加剧，中标价格战",
+      "房建业务受地产下行拖累"
+    ],
+    "buy_zones": {
+      "value": {"price": 3.85, "rationale": "PB 0.8x · 历史底部 + 净资产折价"},
+      "growth": {"price": 4.10, "rationale": "城投整合落地前的博弈价"},
+      "technical": {"price": 4.25, "rationale": "MA120 支撑位 · 需放量确认"},
+      "youzi": {"price": 4.50, "rationale": "城投板块联动时的短线切入点"}
+    }
+  }
+}
+```
+
+**stage2() 会自动读取 agent_analysis.json，合并到 synthesis 中。** Agent 写入的字段优先级高于脚本生成的 stub。
 
 ### Stage 2 · 生成报告
 
@@ -96,7 +142,8 @@ genuine investment analysis. The whole point of this plugin is agent-driven judg
 python -c "from run_real_test import stage2; stage2('<ticker>')"
 ```
 
-Stage 2 读取你更新后的 panel.json + synthesis，生成 HTML 报告。
+Stage 2 读取你更新后的 panel.json + agent_analysis.json，合并生成 HTML 报告。
+如果没有 agent_analysis.json，退化为纯脚本模式（会打印警告）。
 
 ### 快速模式（跳过 agent 介入）
 
@@ -411,9 +458,20 @@ Agent prompt:
 
 每个价位**必须附一句解释**。
 
-### 写入
+### 写入（v2.2 闭环机制）
 
-以上 5 件事全部写入 `synthesis.json`。脚本里有 `generate_synthesis()` 会生成 stub，但**默认是程序化的**。你要在 stub 基础上**重写**这几个关键字段。
+以上 5 件事全部写入 **`.cache/{ticker}/agent_analysis.json`**（不是直接写 synthesis.json！）。
+
+stage2() 的 `generate_synthesis()` 会自动读取 agent_analysis.json 并合并：
+- `dim_commentary` → 替换脚本占位符
+- `panel_insights` → 写入 synthesis
+- `great_divide_override` → 替换脚本生成的辩论轮次和金句
+- `narrative_override.core_conclusion` → 替换脚本结论
+- `narrative_override.risks` → 替换脚本风险
+- `narrative_override.buy_zones` → 替换脚本买入区间
+- `agent_reviewed: true` → 标记为 agent 已审查
+
+**如果你直接写 synthesis.json，stage2() 会覆盖它。** 必须写 agent_analysis.json，stage2 会合并。
 
 ---
 
@@ -499,17 +557,20 @@ python run.py <股票代码> --no-browser      # 强制不打开浏览器
 
 ## 📁 数据契约 & 文件路径
 
-| 文件 | 谁写 | 谁读 |
-|---|---|---|
-| `.cache/{ticker}/raw_data.json` | Task 1/1.5 脚本 | Task 2-5 + 你 |
-| `.cache/{ticker}/dimensions.json` | Task 2 脚本 + 你的 `dim_commentary` | Task 4-5 |
-| `.cache/{ticker}/panel.json` | Task 3 规则引擎 | Task 4-5 |
-| `.cache/{ticker}/synthesis.json` | **你主导写** | Task 5 |
-| `reports/{ticker}_{date}/full-report.html` | Task 5 脚本 | 用户 |
-| `reports/{ticker}_{date}/full-report-standalone.html` | inline_assets.py | 用户分享 |
-| `reports/{ticker}_{date}/share-card.png` | render_share_card | 朋友圈 |
-| `reports/{ticker}_{date}/war-report.png` | render_war_report | 战报 |
-| `reports/{ticker}_{date}/one-liner.txt` | assemble 副产 | 快速摘要 |
+| 文件 | 谁写 | 谁读 | 闭环角色 |
+|---|---|---|---|
+| `.cache/{ticker}/raw_data.json` | Task 1/1.5 脚本 | Task 2-5 + 你 | 数据源 |
+| `.cache/{ticker}/dimensions.json` | Task 2 脚本 | Task 4-5 | 评分 |
+| `.cache/{ticker}/panel.json` | Task 3 规则引擎 → **你覆盖** | stage2 | 骨架→真实判断 |
+| **`.cache/{ticker}/agent_analysis.json`** | **🧠 你写** | **stage2 自动合并** | **闭环关键** |
+| `.cache/{ticker}/synthesis.json` | stage2 (合并 agent_analysis) | Task 5 | 最终研判 |
+| `reports/{ticker}_{date}/full-report.html` | Task 5 脚本 | 用户 | 报告 |
+| `reports/{ticker}_{date}/full-report-standalone.html` | inline_assets.py | 用户分享 | 独立报告 |
+| `reports/{ticker}_{date}/share-card.png` | render_share_card | 朋友圈 | 分享卡 |
+| `reports/{ticker}_{date}/war-report.png` | render_war_report | 战报 | 战报 |
+| `reports/{ticker}_{date}/one-liner.txt` | assemble 副产 | 快速摘要 | 一句话 |
+
+> ⚠️ **agent_analysis.json 是 v2.2 新增的闭环文件。** stage2() 会自动读取并合并到 synthesis 中。如果你不写这个文件，stage2 退化为纯脚本模式（会打印警告）。
 
 详细 schema 见 `assets/data-contracts.md`。
 
@@ -563,10 +624,11 @@ python run.py <股票代码> --no-browser      # 强制不打开浏览器
 
 ## ✅ 完成定义
 
-- 5 个 JSON 产物全部落地
+- **6 个 JSON 产物全部落地**（raw_data + dimensions + panel + agent_analysis + synthesis + report）
 - `raw_data.json` 完整性覆盖 ≥ 90%
-- `dim_commentary` 至少覆盖 15/22 维度
-- `synthesis.json` 中 punchline / core_conclusion / debate.rounds / buy_zones / risks 都由你亲自写
+- **`agent_analysis.json` 必须存在且 `agent_reviewed: true`**
+- `dim_commentary` 至少覆盖 15/22 维度（在 agent_analysis.json 中）
+- `synthesis.json` 中 punchline / core_conclusion / debate.rounds / buy_zones / risks 都来自 agent 覆盖（通过 agent_analysis.json 合并）
 - HTML 报告打开无 console error
 - 金句里包含具体数字
 - 杀猪盘等级始终显示

@@ -56,9 +56,29 @@ Stage 1 跑完后，**你必须做以下事情**：
 
 把 4 个 agent 返回的 {signal, score, headline, reasoning} 覆盖到 `.cache/{ticker}/panel.json` 的对应投资者上。
 
-**4. 写你的定性评语**
+**4. 写 agent_analysis.json（闭环关键！）**
 
 对关键维度（财报/估值/护城河/行业）写 1-2 句定性评语。如果需要，web search 补充信息。
+
+把所有 agent 产出写入 `.cache/{ticker}/agent_analysis.json`：
+```python
+from lib.cache import write_task_output
+write_task_output(ticker, "agent_analysis", {
+    "agent_reviewed": True,
+    "dim_commentary": { "0_basic": "...", "1_financials": "...", ... },
+    "panel_insights": "整体评委观察...",
+    "great_divide_override": {
+        "punchline": "冲突金句",
+        "bull_say_rounds": ["R1", "R2", "R3"],
+        "bear_say_rounds": ["R1", "R2", "R3"]
+    },
+    "narrative_override": {
+        "core_conclusion": "综合结论",
+        "risks": ["风险1", "风险2", ...],
+        "buy_zones": { ... }
+    }
+})
+```
 
 ### 第三段 · 生成报告（脚本完成）
 
@@ -66,7 +86,8 @@ Stage 1 跑完后，**你必须做以下事情**：
 python -c "from run_real_test import stage2; stage2('$ARGUMENTS')"
 ```
 
-这会读取你更新后的 panel.json + 数据，生成最终 HTML 报告。
+stage2 会自动读取 panel.json + agent_analysis.json，合并生成最终报告。
+agent_analysis.json 中的字段优先级高于脚本 stub。
 
 ### 第四段 · 向用户汇报
 
