@@ -332,11 +332,15 @@ A: Yes. akshare / Eastmoney / XueQiu / CNInfo / HKEXNews all serve international
 
 Live count: ![GitHub Repo stars](https://img.shields.io/github/stars/wbh604/UZI-Skill?style=social)
 
-<a href="https://github.com/wbh604/UZI-Skill/stargazers">
-  <img alt="Star History Chart" src="https://starchart.cc/wbh604/UZI-Skill.svg" width="700" />
+<a href="https://star-history.com/#wbh604/uzi-skill&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wbh604/uzi-skill&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=wbh604/uzi-skill&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wbh604/uzi-skill&type=Date" />
+ </picture>
 </a>
 
-> Switched star-history providers: this repo went from 0 → 500+ in one day, too fast for `star-history.com`'s 24h server-side cache (its SVG gets stuck on an early snapshot). `starchart.cc` queries GitHub in real time; the shields.io badge above is also live.
+> Note: star-history.com caches server-side for 24h, so the chart may lag during fast-growth days. For the true current count, see the shields.io badge above — or click the chart to open the live star-history.com page (that triggers a backend refresh).
 
 ---
 
