@@ -5,22 +5,33 @@ import json
 import sys
 from datetime import datetime
 
-from lib.web_search import search, extract_snippets, quick_summary
+from lib.web_search import search, extract_snippets, quick_summary, search_trusted
 
 
 def main(industry: str = "综合") -> dict:
     year = datetime.now().year
-    queries = {
+    # v2.7.3 · 利率/政策/汇率用 3_macro 权威域（stats.gov.cn / pbc / safe / 中证网...）
+    # 行业宏观 + 大宗商品用普通 search（覆盖面更广）
+    trusted_queries = {
         "rate_cycle": f"{year} 中国 利率 货币政策 降息 最新",
         "us_rate": f"{year} 美联储 利率周期 最新",
         "fx_trend": f"{year} 人民币 汇率 走势",
+    }
+    generic_queries = {
         "geo_risk": f"{year} 中美关系 贸易 制裁 {industry}",
         "commodity": f"{year} 大宗商品 周期 CRB指数",
         "industry_macro": f"{year} {industry} 宏观 政策 利好 利空",
     }
 
     snippets: dict[str, list] = {}
-    for key, q in queries.items():
+    for key, q in trusted_queries.items():
+        res = search_trusted(q, dim_key="3_macro", max_results=4)
+        valid = [r for r in res if "error" not in r]
+        snippets[key] = [
+            {"title": r.get("title", "")[:80], "body": r.get("body", "")[:200], "url": r.get("url", "")}
+            for r in valid[:3]
+        ]
+    for key, q in generic_queries.items():
         res = search(q, max_results=4)
         valid = [r for r in res if "error" not in r]
         snippets[key] = [

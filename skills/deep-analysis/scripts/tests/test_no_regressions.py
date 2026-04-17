@@ -252,6 +252,35 @@ def test_wave2_persists_before_wave3():
         "BUG#R9 regression: wave2 结束到 wave3 开始之间必须有 _persist_progress()"
 
 
+# ─── v2.7.3 · search_trusted 必须覆盖 5 个核心定性维度 ──
+def test_trusted_domains_covers_qualitative_dims():
+    from lib.web_search import TRUSTED_DOMAINS_BY_DIM, trusted_domains_for
+    # 这 5 个定性维度必须有权威域映射，否则 v2.7.3 的质量提升失效
+    MUST_HAVE = ("3_macro", "13_policy", "15_events", "14_moat", "17_sentiment")
+    for dim in MUST_HAVE:
+        domains = trusted_domains_for(dim)
+        assert len(domains) >= 3, f"v2.7.3 regression: {dim} 权威域少于 3 个（当前 {len(domains)}）"
+
+
+# ─── v2.7.3 · 关键 fetcher 必须引用 search_trusted ──
+def test_qualitative_fetchers_use_search_trusted():
+    """fetch_macro / fetch_policy / fetch_events / fetch_moat 必须调 search_trusted"""
+    for fname in ("fetch_macro.py", "fetch_policy.py", "fetch_events.py", "fetch_moat.py"):
+        src = (SCRIPTS_DIR / fname).read_text(encoding="utf-8")
+        assert "search_trusted" in src, \
+            f"v2.7.3 regression: {fname} 没接入 search_trusted（权威域搜索失效）"
+
+
+# ─── v2.7.3 · registry 必须含 Codex 建议的权威源 ──
+def test_registry_contains_codex_authority_sources():
+    from lib.data_source_registry import SOURCES
+    ids = {s.id for s in SOURCES}
+    MUST_HAVE = {"cnstock", "cs_cn", "stcn", "nbd", "pbc", "safe", "stats_gov",
+                 "chinabond", "ine", "guba_em_list"}
+    missing = MUST_HAVE - ids
+    assert not missing, f"v2.7.3 regression: registry 缺权威源 {missing}"
+
+
 if __name__ == "__main__":
     # Manual runner — no pytest required
     import inspect

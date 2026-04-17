@@ -1,5 +1,84 @@
 # Release Notes
 
+## v2.7.3 — 2026-04-17 (data-source expansion)
+
+> **按 Codex 建议扩充 14 个权威数据源 + 新增 `search_trusted` site: 限定搜索**
+
+### 背景
+Codex 建议补一批稳定层数据源，重点是「权威媒体 + 官方宏观 + 银行间利率 + 社区舆情」。本次经过全部 20+ URL 的联网可达性 + 结构探测后，按实测可用性落地。
+
+### 实测验证（发布前）
+```
+✓ cnstock     中证网       200 OK   ddgs site: 返真实文章 URL
+✓ cs_cn       中证网（cs.com.cn）  返"茅台股东大会一席难求"等真实标题
+✓ stcn        证券时报     返"腾讯控股开启新一轮回购"
+✓ nbd         每经网       返"贵州茅台2025年营业总收入约1721亿元"
+✓ pbc         央行         返 LPR 政策文件
+✓ stats_gov   统计局       返 PMI 2026/03 数据英文页
+✓ chinabond   中债         yield.chinabond.com.cn/ 200 OK
+✓ ine         能交所       200 OK
+✓ guba_em_list 东财股吧     list,600519.html 含 169 条真实帖子
+✓ jisilu / fx678 / cmc     reachable
+```
+
+### 新增
+
+**registry 扩充 14 条数据源**（`lib/data_source_registry.py`）
+- Tier-3 权威（ddgs 查询）: `cnstock` · `cs_cn` · `stcn` · `nbd` · `pbc` · `safe` · `stats_gov` · `chinamoney` · `chinabond` · `ine`
+- Tier-2 增量: `guba_em_list` · `jisilu` · `fx678` · `cmc`
+- 共 54 个 source（22 tier-1 + 11 tier-2 + 21 tier-3）
+
+**`lib/web_search.py` 新增 `search_trusted(query, dim_key=...)` 辅助函数**
+- 自动 prepend `(site:d1 OR site:d2 ...)` 到查询，限定在 dim 对应的权威域
+- `TRUSTED_DOMAINS_BY_DIM` 映射 9 个定性维度到权威域白名单：
+  - `3_macro`  → stats.gov.cn, pbc.gov.cn, safe.gov.cn, chinamoney.com.cn, chinabond.com.cn, 中证网...
+  - `13_policy` → gov.cn, csrc, miit, ndrc, samr, pbc, safe, 中证网...
+  - `15_events` → cs.com.cn, cnstock, stcn, nbd, sse, szse, hkexnews, 一财, 财联社...
+  - `17_sentiment` → xueqiu, guba, tgb, jisilu, 知乎...
+  - `18_trap` → 知乎, 微博, 小红书, 抖音, tgb, 股吧...
+  - `7_industry / 14_moat / 8_materials / 9_futures` 同理
+
+**接入 4 个关键定性 fetcher**
+- `fetch_policy` · 全部查询改走 `search_trusted(dim_key="13_policy")`
+- `fetch_macro` · 利率/政策/汇率走权威域；地缘/大宗保留普通 search
+- `fetch_events` · 先权威域，命中 < 3 时兜底普通 search
+- `fetch_moat` · 先权威域，命中 < 3 时兜底普通 search
+
+**不改动的 fetcher**
+- `fetch_sentiment` · 已有按平台 `site:` 查询，设计完备
+- `fetch_trap_signals` · 需要明确命中小红书/抖音/微信群 → 强制权威域反而会漏掉风险信号
+
+### 质量提升实例
+查询 `2026 白酒 国家政策 扶持 利好`：
+- v2.7.2：大量返回"白酒"词典解释 + 百科 + 广告
+- v2.7.3：返工信部《酿酒产业提质升级指导意见（2026—2030 年）》原文 + 沪苏浙皖长三角工信委政策 + 其他政府真实政策文件
+
+查询 `2026 中国 利率 货币政策`：
+- v2.7.3：返 gov.cn LPR 政策解读、上海金融委 LPR 报告、中国政府网"LPR 年内首降"等真实政策文件
+
+### 回归
+- 24/24 regression tests pass（新增 3 条：trusted_domains 覆盖 / fetcher 接入 / registry 含新源）
+- 所有 fetcher import OK
+- fetch_policy('白酒') 实测返工信部政策文件
+
+### 未实施（Codex 建议但实测不适合）
+- `cnstock_news` 子域 403（反爬）→ 只用主域 + site: 搜索
+- `fx678/news`、`tgb/search` 列表路径失效 → 走 ddgs site:
+- `chinabond yield` API 需要特定签名 → 只做发现用途
+- `zqrb / cffex / gfex / SEC` SSL 或反爬问题 → 先不放主链路
+- `mairui` 需 license → 不作零配置主源，保留在建议 P2
+
+### 改动文件
+- `scripts/lib/data_source_registry.py` · +120 行（新增 14 个 DataSource）
+- `scripts/lib/web_search.py` · +50 行（`TRUSTED_DOMAINS_BY_DIM` + `search_trusted`）
+- `scripts/fetch_policy.py` · 全部查询切到 search_trusted
+- `scripts/fetch_macro.py` · 3 类查询分流（权威 / 通用）
+- `scripts/fetch_events.py` · 权威优先 + 通用兜底
+- `scripts/fetch_moat.py` · 权威优先 + 通用兜底
+- 版本号 2.7.2 → 2.7.3（4 个 manifest）
+
+---
+
 ## v2.7.2 — 2026-04-17 (hotfix)
 
 > **修复港股财报完全空 + 港股 K 线无 fallback + wave2 结束未 flush 的 3 个硬伤**

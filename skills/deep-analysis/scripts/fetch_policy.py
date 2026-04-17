@@ -5,7 +5,7 @@ import json
 import sys
 from datetime import datetime
 
-from lib.web_search import search
+from lib.web_search import search, search_trusted
 
 
 def main(industry: str = "综合") -> dict:
@@ -19,8 +19,9 @@ def main(industry: str = "综合") -> dict:
     snippets: dict[str, list] = {}
     sentiment_map: dict[str, str] = {}
 
+    # v2.7.3 · 政策 dim 全部用 13_policy 权威域（gov.cn / csrc / 中证网 / 证券时报 ...）
     for key, q in queries.items():
-        res = search(q, max_results=4)
+        res = search_trusted(q, dim_key="13_policy", max_results=4)
         valid = [r for r in res if "error" not in r]
         snippets[key] = [
             {"title": r.get("title", "")[:80], "body": r.get("body", "")[:200], "url": r.get("url", "")}

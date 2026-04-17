@@ -6,7 +6,7 @@ import sys
 
 from lib import data_sources as ds
 from lib.market_router import parse_ticker
-from lib.web_search import search
+from lib.web_search import search, search_trusted
 
 
 def _evaluate(text: str, pos_kws: list[str], neg_kws: list[str]) -> int:
@@ -54,7 +54,10 @@ def main(ticker: str) -> dict:
 
     results: dict[str, dict] = {}
     for key, q in queries.items():
-        res = search(q, max_results=6)
+        # v2.7.3 · 护城河查询用 14_moat 权威域（每经/一财/中证网/华尔街见闻）
+        # 权威域未命中时用普通 search 补位
+        res_t = search_trusted(q, dim_key="14_moat", max_results=6)
+        res = res_t if len(res_t) >= 3 else list(res_t) + list(search(q, max_results=6))
         # Filter: remove errors + dictionary garbage
         valid = [r for r in res
                  if "error" not in r

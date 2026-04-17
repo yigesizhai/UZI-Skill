@@ -374,6 +374,131 @@ _TIER3: list[DataSource] = [
         3, "http", "known_good",
         "现货价格数据库"
     ),
+
+    # ── v2.7.3 · 权威媒体（用 ddgs site: 查询抓标题/正文片段） ──
+    DataSource(
+        "cnstock", "中国证券网",
+        "https://www.cnstock.com/",
+        ("A", "H"),
+        ("15_events", "6_research", "17_sentiment", "13_policy"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 上证 e 互动 / 新股报告 / 公司公告交叉验证。ddgs site:cnstock.com 验证返真实新闻标题"
+    ),
+    DataSource(
+        "cs_cn", "中证网",
+        "https://www.cs.com.cn/",
+        ("A", "H"),
+        ("15_events", "13_policy", "17_sentiment"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 中证报权威；ddgs site:cs.com.cn 返公司/政策真实新闻"
+    ),
+    DataSource(
+        "stcn", "证券时报",
+        "https://www.stcn.com/",
+        ("A", "H"),
+        ("15_events", "17_sentiment", "13_policy"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 证券时报网；ddgs site:stcn.com 返真实文章（如：腾讯控股回购）"
+    ),
+    DataSource(
+        "nbd", "每日经济新闻",
+        "https://www.nbd.com.cn/",
+        ("A", "H", "U"),
+        ("15_events", "17_sentiment", "18_trap", "14_moat"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 每经网产业/公司新闻；ddgs site:nbd.com.cn 返真实新闻"
+    ),
+
+    # ── v2.7.3 · 官方宏观 + 利率环境 ──
+    DataSource(
+        "pbc", "中国人民银行",
+        "http://www.pbc.gov.cn/",
+        ("A", "H"),
+        ("3_macro", "13_policy"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 央行利率 / 货币政策原文；ddgs site:pbc.gov.cn"
+    ),
+    DataSource(
+        "safe", "国家外汇管理局",
+        "https://www.safe.gov.cn/",
+        ("A", "H", "U"),
+        ("3_macro", "13_policy"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 外汇 / 跨境资金政策"
+    ),
+    DataSource(
+        "stats_gov", "国家统计局",
+        "http://www.stats.gov.cn/",
+        ("A", "H"),
+        ("3_macro", "7_industry"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · GDP / PMI / CPI / 工业增加值原始数据；ddgs site:stats.gov.cn"
+    ),
+    DataSource(
+        "chinamoney", "中国货币网",
+        "https://www.chinamoney.com.cn/",
+        ("A",),
+        ("3_macro", "12_capital_flow"),
+        3, "ddgs", "known_good",
+        "v2.7.3 新增 · 银行间市场 / Shibor / CFETS"
+    ),
+    DataSource(
+        "chinabond", "中国债券信息网",
+        "https://yield.chinabond.com.cn/",
+        ("A",),
+        ("3_macro", "10_valuation"),
+        3, "http", "known_good",
+        "v2.7.3 新增 · 国债收益率曲线（WACC 无风险利率锚）；首页 yield.chinabond.com.cn/ 200 OK"
+    ),
+
+    # ── v2.7.3 · 期货 / 能源 ──
+    DataSource(
+        "ine", "上海国际能源交易中心",
+        "https://www.ine.cn/",
+        ("A",),
+        ("8_materials", "9_futures"),
+        3, "http", "known_good",
+        "v2.7.3 新增 · 原油/燃油/天然橡胶期货日报"
+    ),
+]
+
+
+# ═══════════════════════════════════════════════════════════════
+# v2.7.3 · Tier-2 社区/股吧增量（与权威媒体分层）
+# ═══════════════════════════════════════════════════════════════
+_TIER2_EXTRA_V273: list[DataSource] = [
+    DataSource(
+        "guba_em_list", "东财股吧 list 页（按股票代码）",
+        "https://guba.eastmoney.com/list,{code}.html",
+        ("A", "H"),
+        ("17_sentiment", "18_trap", "19_contests"),
+        2, "http", "known_good",
+        "v2.7.3 新增 · list,{code}.html 200 OK 含真实帖子标题；600519/00700 验证可抓"
+    ),
+    DataSource(
+        "jisilu", "集思录",
+        "https://www.jisilu.cn/",
+        ("A",),
+        ("17_sentiment", "19_contests"),
+        2, "ddgs", "flaky",
+        "v2.7.3 新增 · 社区观点 / 可转债/套利；站内搜索要会员，走 ddgs site:jisilu.cn"
+    ),
+    DataSource(
+        "fx678", "汇通财经",
+        "https://www.fx678.com/",
+        ("A", "U"),
+        ("3_macro", "8_materials", "9_futures"),
+        2, "ddgs", "flaky",
+        "v2.7.3 新增 · 大宗商品 / 外汇 / 宏观快讯（列表路径要找，用 ddgs site: 查）"
+    ),
+    DataSource(
+        "cmc", "CompaniesMarketCap",
+        "https://companiesmarketcap.com/",
+        ("H", "U"),
+        ("0_basic", "10_valuation"),
+        2, "http", "known_good",
+        "v2.7.3 新增 · 英文站，港美股市值/估值 fallback；/tencent/marketcap/ 200 OK"
+    ),
 ]
 
 
@@ -381,7 +506,7 @@ _TIER3: list[DataSource] = [
 # Public API
 # ═══════════════════════════════════════════════════════════════
 
-SOURCES: list[DataSource] = _TIER1 + _TIER2 + _TIER3
+SOURCES: list[DataSource] = _TIER1 + _TIER2 + _TIER2_EXTRA_V273 + _TIER3
 
 
 def by_id(source_id: str) -> DataSource | None:

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import akshare as ak  # type: ignore
 from lib.market_router import parse_ticker
-from lib.web_search import search as web_search
+from lib.web_search import search as web_search, search_trusted
 
 
 def _cninfo_disclosures(code: str, days_back: int = 180) -> list[dict]:
@@ -91,9 +91,12 @@ def _web_search_events(name: str, max_results: int = 6) -> list[dict]:
     ]
     results = []
     seen = set()
+    # v2.7.3 · 先用 15_events 权威域（中证网/证券时报/每经/交易所）搜，
+    # 缺口用普通 search 兜底。权威源返回质量远高于百科/贴吧/小红书。
     for q in queries:
-        res = web_search(q, max_results=max_results)
-        for r in res:
+        res_trusted = search_trusted(q, dim_key="15_events", max_results=max_results)
+        res_generic = web_search(q, max_results=max_results) if len(res_trusted) < 3 else []
+        for r in list(res_trusted) + list(res_generic):
             if "error" in r:
                 continue
             title = r.get("title", "")[:80]

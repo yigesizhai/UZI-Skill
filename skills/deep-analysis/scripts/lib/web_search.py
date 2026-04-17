@@ -23,6 +23,53 @@ except ImportError:
 _SEARCH_TTL = 12 * 60 * 60  # 12h — news can update but we don't need bleeding edge
 
 
+# ═══════════════════════════════════════════════════════════════
+# v2.7.3 · Trusted authority domains per dimension
+# ═══════════════════════════════════════════════════════════════
+# 把 Codex 建议的权威媒体 + 官方宏观源映射到定性维度。fetcher 可以调
+# search_trusted(dim_key=..., query=...) 自动 prepend `(site:d1 OR site:d2 ...)`，
+# 让 ddgs 限定在权威域里，显著提升结果质量（减少小红书/爬虫站噪声）。
+#
+# 验证（v2.7.3 发布前）：每个域 ddgs site: 查询都能返真实新闻标题。
+TRUSTED_DOMAINS_BY_DIM: dict[str, tuple[str, ...]] = {
+    # 宏观 / 政策
+    "3_macro":  ("stats.gov.cn", "pbc.gov.cn", "safe.gov.cn", "gov.cn",
+                 "chinamoney.com.cn", "chinabond.com.cn",
+                 "cs.com.cn", "cnstock.com", "stcn.com", "nbd.com.cn"),
+    "13_policy": ("gov.cn", "csrc.gov.cn", "miit.gov.cn", "ndrc.gov.cn",
+                  "samr.gov.cn", "pbc.gov.cn", "safe.gov.cn",
+                  "cs.com.cn", "cnstock.com", "stcn.com"),
+    # 事件 / 公告 / 新闻
+    "15_events": ("cs.com.cn", "cnstock.com", "stcn.com", "nbd.com.cn",
+                  "sse.com.cn", "szse.cn", "hkexnews.hk",
+                  "yicai.com", "cls.cn", "wallstreetcn.com"),
+    # 舆情 / 散户
+    "17_sentiment": ("xueqiu.com", "guba.eastmoney.com", "tgb.cn",
+                     "jisilu.cn", "zhihu.com",
+                     "nbd.com.cn", "stcn.com"),
+    # 杀猪盘 / 风险信号
+    "18_trap": ("zhihu.com", "weibo.com", "xiaohongshu.com", "douyin.com",
+                "tgb.cn", "guba.eastmoney.com",
+                "cs.com.cn", "nbd.com.cn"),
+    # 行业 / 产业链
+    "7_industry": ("stats.gov.cn", "miit.gov.cn", "ndrc.gov.cn",
+                   "cs.com.cn", "cnstock.com", "stcn.com", "nbd.com.cn"),
+    # 护城河 / 竞争格局
+    "14_moat": ("nbd.com.cn", "yicai.com", "cs.com.cn", "stcn.com",
+                "wallstreetcn.com", "cls.cn"),
+    # 原材料 / 期货
+    "8_materials": ("shfe.com.cn", "dce.com.cn", "czce.com.cn",
+                    "ine.cn", "100ppi.com", "fx678.com"),
+    "9_futures":   ("shfe.com.cn", "dce.com.cn", "czce.com.cn",
+                    "ine.cn", "fx678.com"),
+}
+
+
+def trusted_domains_for(dim_key: str) -> tuple[str, ...]:
+    """Return authority-ranked domains for a dim. Empty tuple if dim unknown."""
+    return TRUSTED_DOMAINS_BY_DIM.get(dim_key, ())
+
+
 def _ddg_search(query: str, max_results: int = 10, region: str = "cn-zh") -> list[dict]:
     if not _DDGS_OK:
         return []
@@ -77,6 +124,44 @@ def search(query: str, max_results: int = 10, cache_key_prefix: str = "ws") -> l
     )
     # Quality filter: remove dictionary/wikipedia garbage
     return [r for r in raw if not _is_garbage_result(r)]
+
+
+def search_trusted(
+    query: str,
+    dim_key: str,
+    max_results: int = 8,
+    extra_sites: tuple[str, ...] = (),
+    max_sites: int = 6,
+) -> list[dict]:
+    """v2.7.3 · site: 限定在 dim 对应的权威域里搜索。
+
+    把 query 与 `(site:d1 OR site:d2 ...)` 组合发给 ddgs，返回结果只来自权威
+    媒体 / 官方网站。大幅减少百科/词典/小红书广告噪声，显著提升定性维度质量。
+
+    示例：
+        search_trusted("贵州茅台 2026 Q1 业绩", dim_key="15_events")
+        → 只从 cs.com.cn / cnstock.com / stcn.com / nbd.com.cn / ... 返结果
+
+    参数：
+      query: 用户查询
+      dim_key: 维度 key（"3_macro" / "15_events" / ...）决定 site: 白名单
+      max_results: 总条数上限
+      extra_sites: 追加域（比如特定行业要加自建站点）
+      max_sites: OR 里最多拼几个域（过多会超过搜索引擎 query 长度）
+
+    返回：与 search() 一致的 list[dict]。若 dim 无映射，回退到普通 search。
+    """
+    domains = trusted_domains_for(dim_key)
+    if extra_sites:
+        domains = tuple(list(domains) + list(extra_sites))
+    if not domains:
+        return search(query, max_results=max_results)
+    # 截断到 max_sites
+    domains = domains[:max_sites]
+    site_clause = " OR ".join(f"site:{d}" for d in domains)
+    combined = f"({site_clause}) {query}"
+    # 独立 cache_key_prefix，避免和普通 search 撞 cache
+    return search(combined, max_results=max_results, cache_key_prefix=f"wst_{dim_key}")
 
 
 def search_multi(queries: list[str], per_query: int = 5) -> dict[str, list[dict]]:

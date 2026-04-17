@@ -5,6 +5,28 @@
 
 ---
 
+## v2.7.3 (2026-04-17 data-source expansion)
+
+### 增强 · 权威域 site: 搜索 + 14 个 Codex 建议源
+- **动机**：Codex 建议补"权威媒体 + 官方宏观 + 银行间利率 + 社区舆情"四块源
+- **已落地**：14 个 DataSource（cnstock/cs_cn/stcn/nbd/pbc/safe/stats_gov/
+  chinamoney/chinabond/ine/guba_em_list/jisilu/fx678/cmc）
+- **核心机制**：`lib/web_search.py::search_trusted(query, dim_key=...)` 自动
+  prepend `(site:d1 OR site:d2 ...)` 把 ddgs 限定在 dim 对应权威域白名单
+- **接入 fetcher**：fetch_policy（全切）/ fetch_macro（部分）/
+  fetch_events（权威+通用兜底）/ fetch_moat（权威+通用兜底）
+- **不接入**：fetch_trap_signals（需要命中小红书/抖音风险信号，强制权威域
+  反而漏；设计上保留现状）· fetch_sentiment（已有按平台 site: 设计）
+- **回归测试**：`test_trusted_domains_covers_qualitative_dims` /
+  `test_qualitative_fetchers_use_search_trusted` /
+  `test_registry_contains_codex_authority_sources`
+- **若未来改 web_search**：保持 TRUSTED_DOMAINS_BY_DIM 覆盖至少 5 个核心
+  定性维度（3_macro/13_policy/15_events/14_moat/17_sentiment）
+- **若未来改 registry**：cnstock/cs_cn/stcn/nbd/pbc/safe/stats_gov/chinabond/
+  ine/guba_em_list 10 个权威源不得删除
+
+---
+
 ## v2.7.2 (2026-04-17 hotfix)
 
 ### BUG#R7 · HK `1_financials` 永远空（stub 从未实现）
