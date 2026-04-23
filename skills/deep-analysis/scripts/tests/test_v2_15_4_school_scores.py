@@ -168,10 +168,14 @@ def test_template_has_school_scores_marker():
 
 
 def test_assemble_report_has_render_function():
-    """assemble_report.py 必须有 render_school_scores 函数."""
-    src = (SCRIPTS / "assemble_report.py").read_text(encoding="utf-8")
-    assert "def render_school_scores(" in src
-    assert "INJECT_SCHOOL_SCORES" in src
+    """assemble_report.py (或其依赖模块) 必须有 render_school_scores 函数.
+
+    v3.2 · render_school_scores 搬到 lib/report/special_cards.py · INJECT_SCHOOL_SCORES 仍在 assemble_report."""
+    ar_src = (SCRIPTS / "assemble_report.py").read_text(encoding="utf-8")
+    sc_src = (SCRIPTS / "lib" / "report" / "special_cards.py").read_text(encoding="utf-8")
+    merged = ar_src + "\n" + sc_src
+    assert "def render_school_scores(" in merged
+    assert "INJECT_SCHOOL_SCORES" in ar_src  # shell 模板锚点在 assemble_report
 
 
 def test_render_school_scores_returns_html():

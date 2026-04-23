@@ -522,12 +522,15 @@ def test_fetch_industry_has_dynamic_fallback():
 
 # ─── v2.9.1 · 评委汇总渲染完整性 ──
 def test_panel_insights_rendered():
-    """panel_insights 必须被渲染到 HTML，不能写入 synthesis.json 后静默丢弃"""
-    # assemble_report 必须有 render_panel_insights
-    src = (SCRIPTS_DIR / "assemble_report.py").read_text(encoding="utf-8")
-    assert "def render_panel_insights" in src, \
+    """panel_insights 必须被渲染到 HTML，不能写入 synthesis.json 后静默丢弃.
+
+    v3.2 · render_panel_insights 搬到 lib/report/special_cards.py · 调用仍在 assemble_report."""
+    ar_src = (SCRIPTS_DIR / "assemble_report.py").read_text(encoding="utf-8")
+    sc_src = (SCRIPTS_DIR / "lib" / "report" / "special_cards.py").read_text(encoding="utf-8")
+    merged = ar_src + "\n" + sc_src
+    assert "def render_panel_insights" in merged, \
         "v2.9.1 regression: panel_insights 渲染函数缺失（之前的静默丢弃 bug）"
-    assert "render_panel_insights(syn, panel)" in src, \
+    assert "render_panel_insights(syn, panel)" in ar_src, \
         "v2.9.1 regression: panel_insights 未被调用"
     # template 必须有对应 inject 点
     tpl = (SCRIPTS_DIR.parent / "assets" / "report-template.html").read_text(encoding="utf-8")
@@ -536,9 +539,13 @@ def test_panel_insights_rendered():
 
 
 def test_top3_bears_rendered():
-    """share-card 必须对称渲染 Top 3 看多 + Top 3 看空"""
-    src = (SCRIPTS_DIR / "assemble_report.py").read_text(encoding="utf-8")
-    assert "def render_top3_bears" in src, \
+    """share-card 必须对称渲染 Top 3 看多 + Top 3 看空.
+
+    v3.2 · render_top3_bears 搬到 lib/report/panel_cards.py · 调用仍在 assemble_report."""
+    ar_src = (SCRIPTS_DIR / "assemble_report.py").read_text(encoding="utf-8")
+    pc_src = (SCRIPTS_DIR / "lib" / "report" / "panel_cards.py").read_text(encoding="utf-8")
+    merged = ar_src + "\n" + pc_src
+    assert "def render_top3_bears" in merged, \
         "v2.9.1 regression: render_top3_bears 函数缺失（分享卡不对称）"
     tpl = (SCRIPTS_DIR.parent / "assets" / "report-template.html").read_text(encoding="utf-8")
     assert "INJECT_TOP3_BEARS" in tpl, \

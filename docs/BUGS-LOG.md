@@ -7,6 +7,28 @@
 
 ---
 
+## v3.2.0 (2026-04-23 · assemble_report.py 拆分 80%)
+
+### REFACTOR · assemble_report.py 从 2964 → 587 行
+- **症状**：v2.15.x 多个 hotfix（fund / moat / school_scores）都落在 assemble_report.py · 68 函数单文件耦合严重
+- **位置**：`assemble_report.py` · 新增 `lib/report/` 5 个子模块
+- **根因**：所有 render 相关代码堆一个文件 · 改 fund_managers 的人可能不小心碰到 dim_viz 的 SVG · 2964 行导致定位困难
+- **修法**（4 次 commit 物理拆分）：
+  1. `svg_primitives.py` (602 行) · 19 个 svg_* + 9 个 COLOR_* · 纯渲染无业务
+  2. `dim_viz.py` (742 行) · 19 个 _viz_xxx + DIM_VIZ_RENDERERS dispatch
+  3. `institutional.py` (532 行) · DCF/LBO/IC/catalyst/competitive/style_chip
+  4. `panel_cards.py` (183) + `special_cards.py` (544 行) · 51 评委相关 + 特殊卡
+- **验证**：332 tests 全过 · 002217 assemble() 0.0s 出 608KB HTML · 格式 byte-level 一致
+- **回归测试**：4 处 grep 式 test 扩展为拼接 assemble_report + 对应子模块源码
+- **未来改该区域注意事项**：
+  - 新增 render 函数要选对目标文件：`svg_xxx` → svg_primitives · `_viz_xxx` → dim_viz · `render_dim_card` 核心 → assemble_report · panel 相关 → panel_cards · 深度卡片 → special_cards · 机构建模 → institutional
+  - assemble_report.py 对所有抽离函数做 re-export · 改 API 时保持 re-export 完整否则外部调用崩
+  - 循环依赖：每个子模块都重新定义 `_safe` 避免 import assemble_report（防止循环）
+  - grep 式测试脆弱 · 再拆模块时记得扩展 src 拼接列表
+  - `DIM_META` / `CAT_GROUPS` 仍在 assemble_report · 因为 render_dim_card 依赖它们
+
+---
+
 ## v3.1.0 (2026-04-23 · rrt 瘦身 65% · 纯函数 + preflight 抽离)
 
 ### REFACTOR · run_real_test.py 从 2105 → 735 行

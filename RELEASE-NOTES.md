@@ -1,5 +1,63 @@
 # Release Notes
 
+## v3.2.0 — 2026-04-23 (assemble_report.py 深度拆分 · -80%)
+
+> **用户反馈**："后面的继续全部完成 · 你就干就得了"
+
+### 主线升级
+
+`assemble_report.py` 从 **2964 → 587 行**（-80%）· 拆分为 5 个清晰子模块 · 业务零差异.
+
+### 拆分清单
+
+| 新模块 | 行数 | 内容 |
+|---|---|---|
+| `lib/report/svg_primitives.py` | 602 | 19 个 `svg_xxx` 图元 + COLOR_* 常量 |
+| `lib/report/dim_viz.py` | 742 | 19 个 `_viz_xxx` 维度特化 + `DIM_VIZ_RENDERERS` + `_score_class` |
+| `lib/report/institutional.py` | 532 | DCF/LBO/IC memo/catalyst/competitive/style_chip/data_gap_banner |
+| `lib/report/panel_cards.py` | 183 | GROUP_LABELS + jury_seat/chat/vote_bars/top3/risks |
+| `lib/report/special_cards.py` | 544 | friendly_layer/fund_managers/panel_insights/school_scores/debate |
+
+### `assemble_report.py` 剩余结构（587 行）
+
+| 段 | 行数 | 职责 |
+|---|---|---|
+| Header + imports + DIM_META + CAT_GROUPS | ~340 | 配置 + re-exports |
+| `render_dim_card` + `render_dim_category` + `_extract_kpi_value` | ~120 | 维度卡片框架 |
+| `assemble()` 主入口 | ~120 | HTML shell 组装 |
+
+### 向后兼容（100%）
+
+`assemble_report.py` 对所有抽离函数做 `from lib.report.XXX import *` · 所有历史调用保持工作：
+- `from assemble_report import render_fund_managers` ✅
+- `from assemble_report import svg_sparkline` ✅
+- `from assemble_report import _viz_financials` ✅
+
+### 回归测试
+
+- **332 tests 全过**
+- 4 个 grep 式测试扩展为同时读 `assemble_report` + 对应子模块
+- 真机 e2e · 002217 `assemble()` 0.0s 出 608KB HTML · 格式 100% 一致
+
+### v3 累计对比
+
+| 版本 | 焦点 | 行数缩减 |
+|---|---|---|
+| v3.0.0 | pipeline 架构默认启用 | - |
+| v3.1.0 | `run_real_test.py` 瘦身 | 2105 → 735 (-65%) |
+| v3.2.0 | `assemble_report.py` 拆分 | 2964 → 587 (-80%) |
+
+两个巨文件合计从 **5069 行 → 1322 行**（-74%）.
+
+### 非重构决策
+
+评估后不做的重构（属过度工程 · 风险远大于价值）：
+
+- ❌ **v3.1.1 · 22 fetcher adapter 内化**：`fetch_*.py` 仍是独立 CLI 工具（`python fetch_basic.py <ticker>`）· 内化会破坏 user contract · 且 22 × 300 行工作量巨大
+- ❌ **v3.3 · 删除 rrt.collect_raw_data**：是 `UZI_LEGACY=1` 的 fallback collector · 删了等于移除保险绳 · 跟 v3.0 "永远可回退 legacy" 设计冲突
+
+---
+
 ## v3.1.0 — 2026-04-23 (run_real_test.py 深度瘦身 · rrt -65%)
 
 > **用户反馈**："开始 · 直接全部开始做吧"（请求 v3.1/v3.2/v3.3 继续重构）
